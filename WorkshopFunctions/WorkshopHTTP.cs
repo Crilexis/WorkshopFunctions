@@ -10,11 +10,12 @@ using Newtonsoft.Json;
 
 namespace WorkshopFunctions
 {
-    public static class WorkshopExamples
+    public static class WorkshopHTTP
     {
         [FunctionName("WorkshopHTTP")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req,
+            [Queue("outqueue"), StorageAccount("AzureWebJobsStorage")] ICollector<string> msg,
             ILogger log)
         {
             log.LogInformation("C# HTTP trigger function processed a request.");
@@ -25,11 +26,15 @@ namespace WorkshopFunctions
             dynamic data = JsonConvert.DeserializeObject(requestBody);
             name = name ?? data?.name;
 
-            string responseMessage = string.IsNullOrEmpty(name)
-                ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
-                : $"Hello, {name}. This HTTP triggered function executed successfully.";
+            if (!string.IsNullOrEmpty(name))
+            {
+                // Add a message to the output collection.
+                msg.Add(string.Format("Name passed to the function: {0}", name));
+            }
 
-            return new OkObjectResult(responseMessage);
+            return name != null
+                ? (ActionResult)new OkObjectResult($"Hello, {name}")
+                : new BadRequestObjectResult("Please pass a name on the query string or in the request body");
         }
     }
 }
